@@ -5,10 +5,10 @@ ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
 # Allows you to add additional packages via build-arg
-ARG ADDITIONAL_PACKAGE
+ARG ADDITIONAL_DEV_PACKAGES
 
 RUN apt-get update \
-    &&  apt-get install -y ca-certificates ${ADDITIONAL_PACKAGE} \
+    &&  apt-get install -y ca-certificates ${ADDITIONAL_DEV_PACKAGES} \
     && rm -rf /var/lib/apt/lists/
 
 # Add non root user
@@ -39,6 +39,13 @@ RUN pip install -r requirements.txt --target=/home/app/libs
 
 # build the actual image with content from the builder image
 FROM --platform=${TARGETPLATFORM:-linux/amd64} python:${TARGETVERSION:-3.9.1}-slim-buster
+
+# install additional packages via build-args
+ARG ADDITIONAL_PACKAGES
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates ${ADDITIONAL_PACKAGES} \
+ && rm -rf /var/lib/apt/lists \
+ && apt-get clean
 
 # Add non root user
 RUN groupadd app && useradd -r -g app app
