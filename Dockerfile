@@ -1,5 +1,5 @@
 # syntax = docker/dockerfile:1.0-experimental
-FROM --platform=${TARGETPLATFORM:-linux/amd64} python:3.9.1-buster
+FROM --platform=${TARGETPLATFORM:-linux/amd64} python:${TARGETVERSION:-3.9.1}-buster as builder
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
@@ -14,25 +14,51 @@ RUN apt-get update \
 # Add non root user
 RUN groupadd app && useradd -r -g app app
 
+# set the workdir
 WORKDIR /home/app/
 
+# copy from current directory to the image
 COPY . .
 
-RUN chown -R app /home/app && \
-    mkdir -p /home/app/ && chown -R app /home/app
+# set the correct owner
+RUN chown -R app /home/app
 
+# run flake8 test
+RUN pip install flake8 
+RUN flake8 --ignore=E501,F401,W504 /home/app
+
+# create the user and set the right python path
 USER app
-ENV PATH=$PATH:/home/app/.local/bin:/home/app/python/bin/
+ENV PATH=$PATH:/home/app/.local/bin:/home/app/bin/
 ENV PYTHONPATH=$PYTHONPATH:/home/app/libs
 
+# install dependencies
 RUN pip install -r requirements.txt --target=/home/app/libs
 
+# fixed building the python environment
+
+# build the actual image with content from the builder image
+FROM --platform=${TARGETPLATFORM:-linux/amd64} python:${TARGETVERSION:-3.9.1}-slim-buster
+
+# Add non root user
+RUN groupadd app && useradd -r -g app app
+
+# Set the workdir
 WORKDIR /home/app/
 
+# copy the file from the builder    
+COPY --from=builder /home/app .
+
+# set the permissions
+RUN chown -R app /home/app 
+
+# switch to the user and set the correct environment
 USER app
+ENV PATH=$PATH:/home/app/.local/bin:/home/app/bin/
+ENV PYTHONPATH=$PYTHONPATH:/home/app/libs
 
-# do not forget the execute bit script to be executed 
-
+# set python as the entrypoint
 ENTRYPOINT ["python"]
 
+# execute the script
 CMD ["/home/app/some-cowy-python-script.py"]
